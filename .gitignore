@@ -1,0 +1,3 @@
+# ignoring the output of building the zig library
+zig-cache/
+zig-out/
