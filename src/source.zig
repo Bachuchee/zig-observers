@@ -24,10 +24,11 @@ pub fn Source(comptime T: type) type {
             self.observers.deinit();
         }
 
-        fn addObserver(self: *@This(), onNotify: *const fn (T) void) !*TypeObserver {
+        fn addObserver(self: *@This(), onNotify: *const fn (TypeObserver, T) void) !*TypeObserver {
             var newObserver = try self.observers.addOne();
 
-            newObserver.*.notify = onNotify;
+            newObserver.*.onNotify = onNotify;
+            newObserver.*.source = self;
 
             return newObserver;
         }
@@ -41,8 +42,19 @@ pub fn Source(comptime T: type) type {
 }
 
 // function for testing
-fn myOnNotify(newVal: i32) void {
+fn myOnNotify(self: observer.Observer(i32), newVal: i32) void {
+    _ = self;
     std.debug.print("Value changed: {}", .{newVal});
+}
+
+fn createOnNotifies(comptime curNumber: i32) *const fn (observer.Observer(i32), i32) void {
+    const amogStruct = struct {
+        pub fn coolOnNotify(self: observer.Observer(i32), newVal: i32) void {
+            _ = self;
+            std.debug.print("\nHello from observer: {} where the value is: {}\n", .{ curNumber, newVal });
+        }
+    };
+    return amogStruct.coolOnNotify;
 }
 
 test "creating-Source" {
@@ -62,6 +74,23 @@ test "creating-observer" {
     defer mySource.deinit();
 
     _ = try mySource.addObserver(myOnNotify);
+
+    mySource.notify();
+}
+
+test "multiple-observers" {
+    const IntSource = Source(i32);
+
+    var mySource = IntSource.init(std.testing.allocator, 24);
+    defer mySource.deinit();
+
+    comptime var i: i32 = 0;
+
+    inline while (i < 10) : (i += 1) {
+        _ = try mySource.addObserver(createOnNotifies(i));
+    }
+
+    mySource.val = 5;
 
     mySource.notify();
 }
